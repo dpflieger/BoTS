@@ -1,14 +1,16 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-import random
-import asyncio
 import aiohttp
-import json
+import asyncio
 import discord
-from string import Template
+import json
+import random
+import requests
+from discord.ext.commands import CommandNotFound
 from discord.ext.commands import Bot
 from discord.ext import commands
+from string import Template
 
 BOT_PREFIX = ("?", "!")
 
@@ -16,6 +18,19 @@ with open("token.txt", "r") as f:
     TOKEN = f.read()
 
 bot = Bot(command_prefix=BOT_PREFIX, description="A 'funny' BOT")
+
+def get_fotw():
+    """
+    Returns a random youtube link from DotaCinema Fails of the Week playlist
+    Link to channel --> https://www.youtube.com/channel/UCNRQ-DWUXf4UVN9L31Y9f3Q
+    """
+    # Channel
+    url = "https://www.youtube.com/playlist?list=PLE14F2057980335BE"
+    page = requests.get(url).content
+    data = str(page).split(' ')
+    item = 'href="/watch?'
+    vids = [line.replace('href="', '"https://www.youtube.com').strip('"') for line in data if item in line]
+    return(random.choice(vids))
 
 def get_joke():
     """
@@ -52,9 +67,15 @@ async def on_ready():
     print("Discord version: ", discord.__version__)
     print("------------------------------------")
 
+@bot.event
+async def on_command_error(ctx, error):
+    if isinstance(error, CommandNotFound):
+        return
+    raise error
+
 # see https://stackoverflow.com/questions/52348148/delete-messages-with-python-discord-bot
 @bot.command(pass_context=True)
-async def purge(ctx, limit: int = 20, member: discord.Member = None, *, matches: str = None):
+async def purge(ctx, limit = 1, member: discord.Member = None, *, matches: str = None):
     """
     Purge all messages, optionally from `member` or contains `matches`.
     """
@@ -69,10 +90,10 @@ async def purge(ctx, limit: int = 20, member: discord.Member = None, *, matches:
                 return False
         return True
     deleted = await ctx.channel.purge(limit=limit, check=check_msg)
-    msg = await ctx.send(ctx, 'purge', len(deleted))
-    await asyncio.sleep(2)
-    await msg.delete()
-
+    ##msg = await ctx.send(ctx, 'purge', len(deleted))
+    ##await asyncio.sleep(1)
+    #await msg.delete()
+    await ctx.send('Deleted {} message(s)'.format(len(deleted)))
 
 @bot.command(pass_context = True)
 async def hello(ctx):
@@ -125,14 +146,17 @@ async def mars(ctx):
     Return a DotA joke.
     Similar to the good old !mars command of the battle.net bots :)
     """
-    random_user = random.choice([user for user in bot.users if user is not ctx.message.author])
-    print(random_user.display_name)
+    random_user = random.choice([user for user in bot.users if user != ctx.message.author])
     dota_joke = Template(get_dota_joke())
-    dota_joke = dota_joke.substitute(victim = ctx.message.author.display_name, random = random_user)
+    dota_joke = dota_joke.substitute(victim = ctx.message.author.display_name, random = random_user.display_name)
     await ctx.send(dota_joke)
 
 @bot.command()
 async def joke(ctx):
     await ctx.send(get_joke())
+
+@bot.command()
+async def fotw(ctx):
+    await ctx.send(get_fotw())
 
 bot.run(TOKEN)
